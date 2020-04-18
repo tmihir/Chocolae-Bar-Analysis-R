@@ -1,0 +1,353 @@
+---
+title: "Performance of Chocolate Bar"
+output: html_document
+---
+#### *Mihir Thakkar*
+#### *August 17, 2019*
+
+###
+
+#Introduction
+    
+###
+  
+   
+####Why Chocolate Bar?
+North Americans prefer chocolates on multiple occasions such as festivals and good luck wishes, etc. Nutella is one of the prominent brands for chocolate. It produces chocolate using rich cocoa and hazelnut. Due to immense sell and preference, a cocoa export company has gathered the data and looking to start manufacturing chocolate. But before taking any step, it is important to understand the changing preference of chocolate containing cocoa level respect to time and cocoa bean location. 
+
+###
+
+####Why it is important for a Cocoa export company to perform analysis on the data?
+The organization wants to target North America. So, it is important to understand the choice of North Americans. Over time the trend has changed from sugary chocolate to low-calorie dark chocolate. To build the operation appropriately, the organization has hired a management consulting firm to perform data analysis.
+
+###
+
+####Project Goal and Dataset description
+Exploratory analysis is a statistical analysis which provides insights, hidden patterns, and the relationship between multiple attributes of the data set. After satisfactory analysis, a statistical predictive model will be built for future reference. 
+
+##
+
+The data set contains more than 1700 observations and 9 attributes. The attributes of the data set are a company, bar/bean origin, recent or old review, review year, cocoa percentage, manufacturer location, rating of the bar, bean type, broad bean origin.
+
+
+Rating System:
+
+  * 5 = Elite
+  * 4 = Premium
+  * 3 = Satisfactory
+  * 2 = Disapponting
+  * 1 = Unpleasant
+  
+From the above ratings, it can be said that review less than 3 means it is **not good** and for rest, it is **good**. 
+
+###
+
+#####Target Variable:
+
+Based on the predictors/independent variables, the model will help to predict the rating of that chocolate product. Predicting the ratings of chocolate would be Target Variable.
+
+###
+
+#####Exploratory/Predictor Variables:
+
+  * __Name of the Company manufacturing the bar__: A categorical variable represents the name of the manufacturer
+  * __Review Date__: A numerical discrete variable presents in which year the reviews were taken
+  * __Cocoa Percent__: A continous numerical variable describes the percentage level of cocoa in a bar/chocolate
+  * __Company Location__: A categorical variable provides information of main campus of manufacturer
+  * __Rating__: A continuous numerical variable provides ratings of chocolate/bar
+
+###
+
+```{r}
+#loadint the required library to perform the operation.
+library(tidyverse)
+library(ggplot2)
+library(gridExtra)
+```
+
+```{r}
+#Loading the Data set and assigning column name for better understanding.
+dataSet <- read.csv("flavors_of_cacao.csv",header = TRUE)
+colnames(dataSet) <- c("Company","Bean_Origin","REF","Review_Date","Cocoa_Percent","Company_Location","Rating","Bean_Type","Broad_Bean_Orign")
+
+```
+
+#Feature Engineering
+```{r}
+#It is important to understand how data looks like. Head will return few first rows and all the columns value
+dataSet %>% head()
+```
+
+```{r}
+#calculate missing values in each column
+dataSet %>% is.na() %>% colSums()
+```
+
+```{r}
+#calculate numerical summary of data that provides mean, median, 1st and 3rd Qu., and Range
+dataSet %>% summary()
+```
+
+Calculate categorical variables, including `NA` as a category
+```{r}
+nrow(is.na(dataSet$Company_Location))
+```
+
+```{r}
+#Cocoa percent contain percentage so it is difficult to perform operation. Convert into character and split the numeric and percentage sign.
+# Converting Cocoa_Percent to Character to make it proper numeric entity
+dataSet$Cocoa_Percent <- as.character(dataSet$Cocoa_Percent)
+dataSet$Cocoa_Percent <- strsplit(dataSet$Cocoa_Percent,split = "%")
+dataSet$Cocoa_Percent <- as.numeric(dataSet$Cocoa_Percent)
+
+#For future operation, Converted Company location to Character. As we will need to split the data as per continent.
+dataSet$Company_Location  <- as.character(dataSet$Company_Location)
+```
+
+###
+
+#####Exploratory Analysis of Data Set:
+
+###
+
+#####Company Location:
+```{r}
+#Finding unique categorical values
+dataSet$Company_Location %>% unique()
+```
+Company Location has more than 50 entities as unique and if we consider it in the logistic regression then we might not get the proper prediction of rating.
+
+###
+
+#Single and Multiple Variable Visualization:
+```{r}
+#Dispersion of Rating in the Data Set
+dataSet %>% ggplot(aes(x = Rating)) + geom_histogram(fill = '#FF9999',bins =10) + xlab("Rating") + ylab("Frequecy") +  ggtitle("Ratings of Chocobar in a DataSet")
+```
+
+The histogram represents that most of the ratings of the chocolate bar lie between 2.5 to 4.3 value. These values are approximate based on the visualization. 
+
+```{r}
+#Relation of Rating with other years
+g2 <- dataSet %>% ggplot(aes(x = as.factor(Review_Date), y = Rating)) + geom_boxplot() +
+  xlab("Review Year") + ylab("Rating of Choclate Bar") + ggtitle("Rating of Chocolate bar in Particular Year")
+
+#Identifying relationship between cocoa percentage and review year
+g3 <- dataSet %>% ggplot(aes(x = as.factor(Review_Date), y = Cocoa_Percent)) + geom_boxplot() +
+  xlab("Review Date") + ylab("Cocoa Percentage") + ggtitle("Relationship between Cocoa Percentage and Review Year")
+
+#Making a single graph to compare how rating and cocoa percentage changing over the time
+grid.arrange(g2,g3)
+```
+
+###
+
+While checking the relation between review years and rating a surprising fact comes out, Data set seems to have similar ratings but a couple of years do not have significant amounts of ratings such as 2007, 2011, 2015, 2016 and 2017. 
+
+The reason behind less entity creates questions such as: 
+
+  * Whether people have reduced consuming chocolate? 
+  * Are not any new chocolates available to taste? 
+
+One thing can be inferred from the view that data is skewed for most of the years. 
+
+###
+
+Most of the ratings have a cocoa percentage between 60-80 and that means that people do prefer cocoa percentage more in the chocolate bar. Also,Data is dispersed and the most important question comes that data does not have equivalent values for a couple of years and what is the reason behind this?
+
+#####Review of Chocolate Bar change:
+```{r}
+#Aggregate Data and make data as per review date
+reviewDateGroup <- dataSet %>%
+  group_by(Review_Date) %>%
+  summarise(Count = n(), AvgRat= mean(Rating))
+
+#Check average change of rate thgouhout the years of data
+reviewDateGroup %>% ggplot(aes(factor(Review_Date),AvgRat)) + 
+                    geom_point(aes(size = Count)) +
+                    xlab("Review Year") + ylab("Average Rating of Chocolate Bar") +
+                    ggtitle("Change of Average Rating between 2006 to 2017")+
+                    scale_size(breaks = seq(0,250,25),name = "Rating Count")
+```
+
+The average value of Chocolate bar each year remains nearly the same but one completely different thing is that sample size taken to evaluate chocolate bar rating. The Year of 2017 only has 25 chocolate bar rating while 2015 and 2014 have count chocolate bar ratings seems the most 225 to 250. 
+
+```{r}
+Review_Year <- as.factor(reviewDateGroup$Review_Date)
+reviewDateGroup %>% ggplot(aes(x = factor(Review_Date),y= Count, fill =Review_Year)) + geom_bar(stat = 'identity') + 
+                    theme_minimal() +
+                    xlab("Review Year") + ylab("Number of Review") +
+                    ggtitle("Number of Review Each Year")
+```
+
+
+###
+
+
+The bar graph showcases that the amount of observations from each year is not the same so concluding with these varying data is not an appropriate solution. The result might not be good but if we combine all the data value then average rating with cocoa percentage remains equivalent for almost years and observations.
+
+
+###
+
+
+```{r}
+#It is important to identify the correlation between variables before making model
+library(corrplot)
+m <- subset.data.frame(dataSet,select = c('Review_Date','Rating','Cocoa_Percent'))
+m$Review_Date <- as.integer(m$Review_Date)
+m$Rating <- as.numeric(m$Rating)
+m$Cocoa_Percent <- as.numeric(m$Cocoa_Percent)
+corVal <- cor(m)
+print(cor(m))
+corrplot(corVal)
+```
+
+Review Year does not have a stronger impact on Cocoa Percentage but it certainly has a good impact on Rating. 
+
+Also, Cocoa Percentage and Rating has good correlation than. If we check then Cocoa Percentage and Rating is more correlated then Review Year with Cocoa percentage or Rating.
+
+###
+
+#####A subset of dataset containing information about Company location = USA or Canada
+
+```{r}
+#Aggregate and Fiter Data to create Subset data
+beanData <- dataSet %>%
+  filter(Company_Location == "U.S.A." | Company_Location == "Canada") %>%
+  group_by(Review_Date,Company_Location,Rating, Cocoa_Percent) %>%
+  summarise()
+
+#Convert the charcter value to factor
+beanData$Company_Location <- as.factor(beanData$Company_Location)
+
+beanData %>% summary()
+```
+
+###
+
+#####Relationship Between Cocoa Percentage in Chocolate with Rating and it will be identified for every review date.
+```{r}
+beanData %>% ggplot(aes(Rating)) + geom_histogram() +
+              xlab("Rating of Chocolate bar") + ylab("Frequency") +
+              ggtitle("Rating of Chocolate Bar Company Location in United States and Canada")
+```
+
+It seems that visualization follows a similar pattern found in the original data set. For the subset of data set two of the algorithm should be followed. 
+
+```{r}
+beanData %>% ggplot(aes(x = as.factor(Review_Date), y = Cocoa_Percent)) + geom_boxplot() +
+  xlab("Review Date") + ylab("Cocoa Percentage") + ggtitle("Relationship between Cocoa Percentage and Review Year")
+```
+
+The data is dispersed and do not have the same amount of attributes in every year. Also, Cocoa percentage is skewed in the data.
+
+###
+
+Over the time study has proven that dark chocolate is good for health as well as good to keep blood pressure in a proper range. 
+
+Before couple of years preference of american was milk chocolate over dark chocolate till 2010. (Statista, 2012), [Milk and dark chocolate consumption in the United States in 2010 by age group](https://www.statista.com/statistics/238730/milk-and-dark-chocolate-consumption-in-the-us-by-age-group/) 
+
+Over the years preference has been changed, Americans prefer chocolates with less sugar, less fat, and calorie, as well as more dark due to the health benefit of dark cocoa. The market for dark chocolate is expected to expand about approx. 7%. (Grand View Research, Jan 2018), [North America Chocolate Market Size Worth $42.16 Billion by 2025](https://www.grandviewresearch.com/press-release/north-america-chocolate-market-analysis)
+
+###
+
+####**Note**
+Since our target is North America, it is not important to visualize the other continent. With the visualization, it can be inferred that the data seems not suitable for prediction.
+
+###
+
+#Model Building and Performance:
+```{r}
+#Converting Rating to Good or Not good. 
+#Converting Rating <3 to 0 which means Not Good else it is 1 means Good
+beanData$Rating <- if_else(beanData$Rating <3, "Not Good","Good")
+
+#To use feature in mdoel, it is important to convert it to factor so model will not consider it as numeric value and assign degree order. 
+beanData$Rating <- as.factor(beanData$Rating)
+```
+
+**1. Introduction to the Model:**
+Our approach is to identify Good and Not Good Chocolate bar. So we decided to move forward with logistic classification. The model will produce output in a probability manner. That probability will define the classifier in output.
+
+###
+
+**The model formula will be:** Rating ~ Review_Date + Company_Location + Cocoa_Percent.
+
+###
+
+**2. Fit the Model:**
+We will use 70:30 split ratio and we will divide the data set using splitting ration: train and test data set.
+```{r}
+#Spliting Data in to Train and Test data set to train and test the model.
+set.seed(123)
+train_index <- sample(1:nrow(beanData),0.7*nrow(beanData))
+test_index <- setdiff(1:nrow(beanData),train_index)
+
+trainD <- beanData[train_index,]
+testD <- beanData[-train_index,]
+```
+
+**Building a logistic model**
+```{r}
+model <- glm(Rating ~ Review_Date + Cocoa_Percent + Company_Location,data = trainD, family = binomial)
+summary(model)
+```
+
+##
+
+**3. Model Regression Coefficients Interpretation:**
+
+  * Intercept has a positive value.
+  * If we check p-value for particular data set then the p-value is so high that it is not significant to rely on this model.
+  
+##
+
+**4. Model Regression Coefficients Interpretation:**
+It is always important to test the built model. To verify the accuracy of the test model, We will use the test data set and predict the outcome of the variable.
+
+```{r}
+#Model Predicted and stored in a variable for future reference
+y_pred = predict(object = model,newdata = testD)
+```
+Since the predicted variable will return the probability value, we will need to convert it into a categorical item to check the outcome. Measuring accuracy will be a good idea here as we want to know good and bad chocolate based on parameters.
+
+##
+
+```{r}
+#Converting Probability value in to Factor for better understanding
+y_pred <- if_else(y_pred >0.5, "Good","Not Good")
+y_pred <- as.factor(y_pred)
+```
+
+
+##
+
+To identify how the model performs. We have simply calculated unique values in both the test data set and predicted data set.
+
+##
+
+```{r}
+#creating matrix for perfoamnce
+#Let us calculate Not good values in the model.
+a1 <- testD$Rating %>% summary()
+a1
+a2 <- y_pred %>% summary()
+a2
+```
+
+#Conclusions:
+
+  * As per the model calculation, there are no **Good** Values and all we got is **Not good** values. We got 141 **Not Good** values. A model is having 100% one value seems weird. The model is not good to rely on. 
+  
+  * Since the model output is not good so I would not prefer to look at the precision and recall. If a model has some relevant information and valid answer then it makes sense to go with the precision or recall. But it seems that the model is 30% accurate to predict the value. 
+  
+##
+
+We mentioned in the note that we might not get good model although we have correlation but predictive model seems not good. As per expectation the model is not good.
+
+
+###
+
+
+  **Note to Organization:**
+  * As a data analyst, I would suggest not to use a model and change the data set. Also, for successful operation, an analyst of the organization must look for recent changes and trends. It is more important to know the current competition and preferences then relying on the predictive model only. 
